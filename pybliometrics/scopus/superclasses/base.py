@@ -64,18 +64,12 @@ class Base:
                 n = int(res['search-results'].get('opensearch:totalResults', 0))
                 self._n = n
                 self._json = []
-                # Results size check
-                if params.get("cursor") is None and n > SEARCH_MAX_ENTRIES:
-                    # Stop if there are too many results
-                    text = f'Found {n} matches.  The query fails to return '\
-                           f'more than {SEARCH_MAX_ENTRIES} entries.  Change '\
-                           'your query such that it returns fewer entries.'
-                    raise ScopusQueryError(text)
+                self._check_results_size(params, n)
                 # Download results page-wise
                 if download:
                     data = ""
                     if n:
-                        data, header = _parse(res, n, url, api, params,
+                        data, header = _parse(resp, n, url, api, params,
                                               verbose, *args, **kwds)
                         self._json = data
                 else:
@@ -91,6 +85,17 @@ class Base:
             if download:
                 text = [dumps(item, separators=(',', ':')) for item in data]
                 fname.write_text("\n".join(text))
+
+    def _check_results_size(self, params, n):
+        if params.get("cursor") is None and n > SEARCH_MAX_ENTRIES:
+            if not Pagination.is_valid(params):
+                # Stop if there are too many results
+                text = f'Found {n} matches. The query fails to return '\
+                    f'more than {SEARCH_MAX_ENTRIES} entries. Change '\
+                    'your query such that it returns fewer entries or '\
+                    'activate pagination by setting "count", "start" and '\
+                    '"number_of_pages" in params.'
+                raise ScopusQueryError(text)
 
     def get_cache_file_age(self) -> int:
         """Return the age of the cached file in days."""
@@ -137,12 +142,18 @@ def _check_file_age(self):
     return refresh, mod_ts
 
 
-def _parse(res, n, url, api, params, verbose, *args, **kwds):
+def _parse(resp, n, url, api, params, verbose, *args, **kwds):
     """Auxiliary function to download results and parse json."""
+    _json = []
+    pagination = Pagination(params)
+
     cursor = "cursor" in params
     if not cursor:
         start = params["start"]
-    _json = res.get('search-results', {}).get('entry', [])
+
+    res = resp.json()
+    _json.extend(res.get('search-results', {}).get('entry', []))
+
     if verbose:
         # Roundup + 1 for the final iteration
         print(f'Downloading results for query "{params["query"]}":')
@@ -151,6 +162,9 @@ def _parse(res, n, url, api, params, verbose, *args, **kwds):
         pbar.update(1)
     # Download the remaining information in chunks
     while n > 0:
+        if not pagination.has_next_page():
+            break
+
         n -= params["count"]
         if cursor:
             pointer = res['search-results']['cursor'].get('@next')
@@ -166,3 +180,41 @@ def _parse(res, n, url, api, params, verbose, *args, **kwds):
     if verbose:
         pbar.close()
     return _json, resp.headers
+
+
+class Pagination:
+
+    def __init__(self, params):
+        self.number_of_pages = None
+        self.pages_counter = 1
+
+        if params['number_of_pages']:
+            self.number_of_pages = params['number_of_pages']
+
+    def is_number_of_pages_set(self):
+        return self.number_of_pages is not None
+
+    def has_next_page(self):
+        if not self.is_number_of_pages_set():
+            return True
+
+        if self.pages_counter >= self.number_of_pages:
+            return False
+        else:
+            self.pages_counter += 1
+            return True
+
+    @staticmethod
+    def is_valid(params):
+        number_of_page_entities = params['count']
+        number_of_pages = params['number_of_pages']
+        start_entity = params['start']
+
+        if number_of_page_entities is None or number_of_pages is None or start_entity is None:
+            return False
+
+        result_size = number_of_pages * number_of_page_entities
+        if result_size > SEARCH_MAX_ENTRIES:
+            return False
+
+        return True
