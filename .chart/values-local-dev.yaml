@@ -1,0 +1,9 @@
+#
+# Values for deployment on localhost
+#
+location: local-dev
+
+chartName: pybliometrics-dev
+
+image: guenltu/sandbox:pybliometrics-3.4.0-dev
+imagePullPolicy: IfNotPresent # Always | IfNotPresent

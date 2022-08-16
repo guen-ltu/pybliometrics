@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.chartName }}
+  labels:
+    app: {{ .Values.chartName }}
+spec:
+  containers:
+    - name: {{ .Values.chartName }}
+      image: {{ .Values.image }}
+      imagePullPolicy: {{ .Values.imagePullPolicy }}
+      volumeMounts:
+        {{- if eq .Values.location "local-dev" }}
+        - name: {{ .Values.chartName }}-volume-repository
+          mountPath: /home/vscode/workspace
+        - name: {{ .Values.chartName }}-volume-vscode-server
+          mountPath: /home/vscode/.vscode-server
+        - name: {{ .Values.chartName }}-volume-data
+          mountPath: /home/vscode/workspace/data
+        {{- end }}
+  volumes:
+    {{- if eq .Values.location "local-dev" }}
+    - name: {{ .Values.chartName }}-volume-repository
+      hostPath:
+        path: {{ required "env for localVolumePath is required!" .Values.localVolumePath }}/repository
+        type: Directory
+    - name: {{ .Values.chartName }}-volume-vscode-server
+      hostPath:
+        path: {{ .Values.localVolumePath }}/vscode-server
+        type: Directory
+    - name: {{ .Values.chartName }}-volume-data
+      hostPath:
+        path: {{ .Values.localVolumePath }}/data
+        type: Directory
+    {{- end }}
+  imagePullSecrets:
+    - name: dockerhub-secret

@@ -1,0 +1,11 @@
+{
+    "recommendations": [
+        "ms-python.python",
+        "davidanson.vscode-markdownlint",
+        "tehnix.vscode-tidymarkdown",
+        "mutantdino.resourcemonitor",
+        "redhat.vscode-yaml",
+        "cameron.rerun-last-command"
+    ],
+    "unwantedRecommendations": []
+}

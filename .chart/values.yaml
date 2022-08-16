@@ -1,0 +1,9 @@
+#
+# General values for all environments
+#
+location: local
+
+chartName: pybliometrics-dev
+
+image: guenltu/sandbox:pybliometrics-3.4.0-dev
+imagePullPolicy: IfNotPresent # Always | IfNotPresent
